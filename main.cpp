@@ -1,6 +1,8 @@
 
 #include "hayai/hayai.hpp"
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <iostream>
 
 namespace perf
 {
@@ -22,6 +24,14 @@ namespace perf
 		}
 		return _freq;
 	}
+
+	TIMECAPS _time_caps = {0};
+	UINT min_time_period()
+	{
+		if(!_time_caps.wPeriodMin)
+			timeGetDevCaps(&_time_caps,sizeof(_time_caps));
+		return _time_caps.wPeriodMin;
+	}
 }
 
 BENCHMARK(Wait,Sleep1SystemRes,5,10)
@@ -34,12 +44,12 @@ struct sleep_hires_fixture : hayai::Fixture
 {
 	void SetUp() override
 	{
-		timeBeginPeriod(1);
+		timeBeginPeriod(perf::min_time_period());
 	}
 
 	void TearDown() override
 	{
-		timeEndPeriod(1);
+		timeEndPeriod(perf::min_time_period());
 	}
 };
 BENCHMARK_F(sleep_hires_fixture,Sleep1HiRes,5,10)
@@ -56,7 +66,7 @@ struct spin_wait_fixture : hayai::Fixture
 
 	uint64_t _freq_ms;
 };
-BENCHMARK_F(spin_wait_fixture,Spin1,10,1000)
+BENCHMARK_F(spin_wait_fixture,Spin1,5,1000)
 {
 	const auto start = perf::qpc_now();
 	for(;;)
@@ -67,7 +77,7 @@ BENCHMARK_F(spin_wait_fixture,Spin1,10,1000)
 	}
 }
 
-BENCHMARK_F(spin_wait_fixture,Spin1Yield,10,1000)
+BENCHMARK_F(spin_wait_fixture,Spin1Yield,5,1000)
 {
 	const auto start = perf::qpc_now();
 	for(;;)
@@ -86,7 +96,10 @@ int main(int argc, char * argv[])
 	
 	hayai::ConsoleOutputter consoleOutputter;
     hayai::Benchmarker::AddOutputter(consoleOutputter);
+	std::cout << "Running benchmarks...please wait while Hayai starts...\n";
     hayai::Benchmarker::RunAllTests();
+
+	std::cout << "\nMin time period used is " << perf::min_time_period() << "ms\n";
 
 	return 0;
 }
