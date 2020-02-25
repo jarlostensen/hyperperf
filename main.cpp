@@ -17,126 +17,139 @@ using microseconds = std::chrono::microseconds;
 
 namespace perf
 {
-	TIMECAPS _time_caps = { 0 };
-	UINT min_time_period()
-	{
-		if (!_time_caps.wPeriodMin)
-			timeGetDevCaps(&_time_caps, sizeof(_time_caps));
-		return _time_caps.wPeriodMin;
-	}
+    TIMECAPS _time_caps = { 0 };
+    UINT min_time_period()
+    {
+        if (!_time_caps.wPeriodMin)
+            timeGetDevCaps(&_time_caps, sizeof(_time_caps));
+        return _time_caps.wPeriodMin;
+    }
 }
 
 BENCHMARK(Wait, SleepSystemRes, 5, 10)
 {
-	Sleep(PERF_WAIT_TIME_MS);
+    Sleep(PERF_WAIT_TIME_MS);
 }
 
 
 struct sleep_hires_fixture : hayai::Fixture
 {
-	void SetUp() override
-	{
-		timeBeginPeriod(perf::min_time_period());
-	}
+    void SetUp() override
+    {
+        timeBeginPeriod(perf::min_time_period());
+    }
 
-	void TearDown() override
-	{
-		timeEndPeriod(perf::min_time_period());
-	}
+    void TearDown() override
+    {
+        timeEndPeriod(perf::min_time_period());
+    }
 };
 BENCHMARK_F(sleep_hires_fixture, SleepHiRes, 5, 10)
 {
-	Sleep(PERF_WAIT_TIME_MS);
+    Sleep(PERF_WAIT_TIME_MS);
 }
 
 BENCHMARK(SpinWait, SpinHot, 5, 1000)
 {
-	const auto start = hi_res_clock::now();
-	for (;;)
-	{
-		const auto now = hi_res_clock::now();
-		if (std::chrono::duration_cast<milliseconds>(now - start).count() >= PERF_WAIT_TIME_MS)
-			break;
-	}
+    const auto start = hi_res_clock::now();
+    for (;;)
+    {
+        const auto now = hi_res_clock::now();
+        if (std::chrono::duration_cast<milliseconds>(now - start).count() >= PERF_WAIT_TIME_MS)
+            break;
+    }
 }
 
 BENCHMARK(SpinWait, SpinYield, 5, 1000)
 {
-	const auto start = hi_res_clock::now();
-	for (;;)
-	{
-		const auto now = hi_res_clock::now();
-		if (std::chrono::duration_cast<milliseconds>(now - start).count() >= PERF_WAIT_TIME_MS)
-			break;
-		Sleep(0);
-	}
+    const auto start = hi_res_clock::now();
+    for (;;)
+    {
+        const auto now = hi_res_clock::now();
+        if (std::chrono::duration_cast<milliseconds>(now - start).count() >= PERF_WAIT_TIME_MS)
+            break;
+        Sleep(0);
+    }
 }
 
 void bench_hayai()
 {
-	hayai::ConsoleOutputter consoleOutputter;
-	hayai::Benchmarker::AddOutputter(consoleOutputter);
-	std::cout << "Running benchmarks...please wait while Hayai starts...\n";
-	hayai::Benchmarker::RunAllTests();
+    hayai::ConsoleOutputter consoleOutputter;
+    hayai::Benchmarker::AddOutputter(consoleOutputter);
+    std::cout << "Running benchmarks...please wait while Hayai starts...\n";
+    hayai::Benchmarker::RunAllTests();
 }
 
 void threads_test()
-{	
-	std::vector<double>	stats;
-	std::mutex stat_mtx;
-	
-	const auto tf = [&stats,&stat_mtx]() {
-		double stat = 0.0;
-		constexpr auto kRuns = 10000u;
+{
+    std::vector<double>	stats;
+    std::mutex stat_mtx;
+
+    const auto tf = [&stats, &stat_mtx]() {
+        double stat = 0.0;
+        constexpr auto kRuns = 4000u;
         for (auto n = 0u; n < kRuns; ++n)
-		{
-			const auto start = hi_res_clock::now();
-			for (;;)
-			{
-				const auto now = hi_res_clock::now();
-				if (std::chrono::duration_cast<milliseconds>(now - start).count() >= 5)
-					break;
-				Sleep(0);
-			}
-			const auto end = hi_res_clock::now();
-			stat += (end - start).count();
-		}
-		std::lock_guard<std::mutex> lock{stat_mtx};
-		stats.emplace_back(stat/kRuns);
-	};
+        {
+            const auto start = hi_res_clock::now();
+            for (;;)
+            {
+                const auto now = hi_res_clock::now();
+                if (std::chrono::duration_cast<milliseconds>(now - start).count() >= 5)
+                    break;
+                Sleep(0);
+            }
+            const auto end = hi_res_clock::now();
+            stat += (end - start).count();
+        }
+        std::lock_guard<std::mutex> lock{ stat_mtx };
+        stats.emplace_back(stat / kRuns);
+    };
 
-	std::vector<std::thread>	_threads;
-	std::cout << "creating/starting " << std::thread::hardware_concurrency() << " threads\n";
-	for(auto t = 0u; t < std::thread::hardware_concurrency(); ++t)
-	{
-	    _threads.emplace_back(tf);
-	}
+    std::vector<std::thread>	_threads;
+    std::cout << "creating/starting " << std::thread::hardware_concurrency() << " threads\n";
+    for (auto t = 0u; t < std::thread::hardware_concurrency(); ++t)
+    {
+        _threads.emplace_back(tf);
+    }
 
-	std::cout << "waiting for threads to finish...";
-	for(auto & t : _threads)
-	{
-	    t.join();
-	}
-	std::cout << "done" << std::endl;
+    std::cout << "waiting for threads to finish...";
+    for (auto& t : _threads)
+    {
+        t.join();
+    }
+    std::cout << "done" << std::endl;
 
-	perf::RunningStat total_stat;
-	for(auto d : stats)
-	{
-	    total_stat.Push(d);
-	}
+    perf::RunningStat total_stat;
+    for (auto d : stats)
+    {
+        total_stat.push(d);
+    }
 
-	std::cout << "\tMean " << total_stat.Mean()/1000000 << "ms, standard deviation " << total_stat.StandardDeviation() << "ns\n";
+    std::cout << "\tMean " << total_stat.mean() / 1000000 << "ms, standard deviation " << total_stat.stdev() / 1000 << "us\n";
+    std::cout << "\tMedian " << total_stat.median() / 1000000 << "ms, 1st quartile " << total_stat.first_quartile() / 1000000 << "ms, 3rd quartile " << total_stat.third_quartile() / 1000000 << "ms" << std::endl;
+    switch (total_stat.shape())
+    {
+    case perf::Stats::Shape::kSymmetric:
+        std::cout << "\tdistribution is ~symmetric\n";
+        break;
+    case perf::Stats::Shape::kLeft:
+        std::cout << "\tdistribution is skewed towards the first quartile\n";
+        break;
+    case perf::Stats::Shape::kRight:
+        std::cout << "\tdistribution is skewed towards the third quartile\n";
+        break;
+    }   
 }
 
 int main(int argc, char* argv[])
 {
-	(void)argc;
-	(void)argv;
+    (void)argc;
+    (void)argv;
 
-	//bench_hayai();
-	threads_test();
+    //bench_hayai();
+    threads_test();
 
-	std::cout << "\nMin time period used is " << perf::min_time_period() << "ms\n";
+    std::cout << "\nMin time period used is " << perf::min_time_period() << "ms\n";
 
-	return 0;
+    return 0;
 }

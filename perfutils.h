@@ -1,6 +1,7 @@
 #pragma once
 #include <type_traits>
 #include <limits>
+#include <algorithm>
 
 namespace perf
 {
@@ -11,67 +12,132 @@ namespace perf
         // the machine epsilon has to be scaled to the magnitude of the values used
         // and multiplied by the desired precision in ULPs (units in the last place)
         return std::abs(x - y) <= std::numeric_limits<T>::epsilon() * std::abs(x + y) * ulp
-               // unless the result is subnormal
-               || std::abs(x - y) < (std::numeric_limits<T>::min)();
+            // unless the result is subnormal
+            || std::abs(x - y) < (std::numeric_limits<T>::min)();
     }
+
+    struct Stats
+    {
+        virtual void push(double x)
+        {
+            _samples.emplace_back(x);
+            _dirty = true;
+        }
+
+        void reset()
+        {
+            _samples.clear();
+            _dirty = true;
+        }
+
+        double median()
+        {            
+            recalc();
+            return _median;
+        }
+
+        double first_quartile()
+        {
+            recalc();
+            return _1stquart;
+        }
+
+        double third_quartile()
+        {
+            recalc();
+            return _3rdquart;
+        }
+
+        enum class Shape
+        {
+            kLeft,
+            kRight,
+            kSymmetric
+        };
+
+        Shape shape()
+        {
+            const auto d1 = abs(median() - first_quartile());
+	        const auto d3 = abs(median() - third_quartile());
+	        if(AlmostEqual(d1,d3))
+                return Shape::kSymmetric;
+            return (d1 < d3) ? Shape::kLeft : Shape::kRight;
+        }
+
+        size_t size() const { return _samples.size(); }
+
+    private:
+        std::vector<double> _samples;
+        double _median = 0.0;
+        double _1stquart = 0.0;
+        double _3rdquart = 0.0;
+        bool _dirty = true;
+
+        void recalc()
+        {
+            if (_dirty)
+            {
+                const auto mid_iter = _samples.begin() + _samples.size() / 2;
+                //NOTE: we're not doing this "properly" for odd sizes but that's not a big deal for our use
+                std::nth_element(_samples.begin(), mid_iter, _samples.end());
+                _median = _samples[_samples.size()/2];
+                
+                std::nth_element(_samples.begin(), _samples.begin() + _samples.size() / 4, mid_iter);
+                _1stquart = _samples[_samples.size()/4];
+
+                std::nth_element(mid_iter, mid_iter+_samples.size()/4,_samples.end());
+                _3rdquart = _samples[_samples.size()/2 + _samples.size()/4];
+
+                _dirty = false;
+            }
+        }
+    };
 
     // Incremental statistics class
     // See https://www.johndcook.com/blog/standard_deviation/
-    class RunningStat
+    struct RunningStat : Stats
     {
-    public:
-        void Push(const double x)
+        void push(double x) override
         {
-            m_numSamples++;
-
             // See Knuth TAOCP vol 2, 3rd edition, page 232
-            if(m_numSamples == 1)
+            if(size() > 1)
             {
-                m_mean = x;
+                const auto previousMean{ _mean };
+                _mean = _mean + (x - _mean) / size();
+                _S = _S + (x - previousMean) * (x - _mean);
             }
             else
             {
-                const auto previousMean{ m_mean };
-                m_mean = m_mean + (x - m_mean) / m_numSamples;
-                m_S = m_S + (x - previousMean) * (x - m_mean);
+                _mean = x;
             }
+            
+            Stats::push(x);
         }
 
-        void Reset()
+        void reset()
         {
-            m_numSamples = 0;
-            m_mean = 0.0;
-            m_S = 0.0;
+            _mean = 0.0;
+            _S = 0.0;
+            Stats::reset();
         }
 
-        int NumDataValues() const
+        double mean() const
         {
-            return m_numSamples;
+            return _mean;
         }
 
-        double Mean() const
+        double variance() const
         {
-            return m_mean;
+            return (size() > 1) ? _S / (size() - 1) : 0.0;
         }
 
-        double Variance() const
+        double stdev() const
         {
-            return (m_numSamples > 1) ? m_S / (m_numSamples - 1) : 0.0;
-        }
-
-        double StandardDeviation() const
-        {
-            return sqrt(Variance());
-        }
-
-        bool operator==(const RunningStat &other) const
-        {
-            return m_numSamples == other.m_numSamples && AlmostEqual(m_mean, other.m_mean) && AlmostEqual(m_S, other.m_S);
+            return sqrt(variance());
         }
 
     private:
-        int m_numSamples{ 0 };
-        double m_mean{ 0.0 };
-        double m_S{ 0.0 };
+        double _mean{ 0.0 };
+        double _S{ 0.0 };
     };
 }
