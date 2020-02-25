@@ -1,42 +1,30 @@
 
 #include "hayai/hayai.hpp"
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
+#include <chrono>
+#include <thread>
 #include <iostream>
+
+using hi_res_clock = std::chrono::high_resolution_clock;
+using milliseconds = std::chrono::milliseconds;
+using nanoseconds = std::chrono::nanoseconds;
+using microseconds = std::chrono::microseconds;
+
+#define PERF_WAIT_TIME_MS 2
 
 namespace perf
 {
-	uint64_t qpc_now()
-	{
-		LARGE_INTEGER q;
-		QueryPerformanceCounter(&q);
-		return q.QuadPart;
-	}
-
-	uint64_t qpc_freq()
-	{
-		static uint64_t _freq = 0;
-		if(!_freq)
-		{
-			LARGE_INTEGER freq;
-			QueryPerformanceFrequency(&freq);
-			_freq = freq.QuadPart;
-		}
-		return _freq;
-	}
-
-	TIMECAPS _time_caps = {0};
+	TIMECAPS _time_caps = { 0 };
 	UINT min_time_period()
 	{
-		if(!_time_caps.wPeriodMin)
-			timeGetDevCaps(&_time_caps,sizeof(_time_caps));
+		if (!_time_caps.wPeriodMin)
+			timeGetDevCaps(&_time_caps, sizeof(_time_caps));
 		return _time_caps.wPeriodMin;
 	}
 }
 
-BENCHMARK(Wait,Sleep1SystemRes,5,10)
+BENCHMARK(Wait, SleepSystemRes, 5, 10)
 {
-	Sleep(1);
+	Sleep(PERF_WAIT_TIME_MS);
 }
 
 
@@ -52,52 +40,80 @@ struct sleep_hires_fixture : hayai::Fixture
 		timeEndPeriod(perf::min_time_period());
 	}
 };
-BENCHMARK_F(sleep_hires_fixture,Sleep1HiRes,5,10)
+BENCHMARK_F(sleep_hires_fixture, SleepHiRes, 5, 10)
 {
-	Sleep(1);
+	Sleep(PERF_WAIT_TIME_MS);
 }
 
-struct spin_wait_fixture : hayai::Fixture
+BENCHMARK(SpinWait, SpinHot, 5, 1000)
 {
-	void SetUp() override
+	const auto start = hi_res_clock::now();
+	for (;;)
 	{
-		_freq_ms = perf::qpc_freq()/1000;
-	}
-
-	uint64_t _freq_ms;
-};
-BENCHMARK_F(spin_wait_fixture,Spin1,5,1000)
-{
-	const auto start = perf::qpc_now();
-	for(;;)
-	{
-		const auto now = perf::qpc_now();
-		if((now - start)/_freq_ms >= 1)
+		const auto now = hi_res_clock::now();
+		if (std::chrono::duration_cast<milliseconds>(now - start).count() >= PERF_WAIT_TIME_MS)
 			break;
 	}
 }
 
-BENCHMARK_F(spin_wait_fixture,Spin1Yield,5,1000)
+BENCHMARK(SpinWait, SpinYield, 5, 1000)
 {
-	const auto start = perf::qpc_now();
-	for(;;)
+	const auto start = hi_res_clock::now();
+	for (;;)
 	{
-		const auto now = perf::qpc_now();
-		if((now - start)/_freq_ms >= 1)
+		const auto now = hi_res_clock::now();
+		if (std::chrono::duration_cast<milliseconds>(now - start).count() >= PERF_WAIT_TIME_MS)
 			break;
 		Sleep(0);
 	}
 }
 
-int main(int argc, char * argv[])
+void bench_hayai()
+{
+	hayai::ConsoleOutputter consoleOutputter;
+	hayai::Benchmarker::AddOutputter(consoleOutputter);
+	std::cout << "Running benchmarks...please wait while Hayai starts...\n";
+	hayai::Benchmarker::RunAllTests();
+}
+
+void threads_test()
+{
+	const auto tf = []() {
+		for (auto n = 0u; n < 10000; ++n)
+		{
+			const auto start = hi_res_clock::now();
+			for (;;)
+			{
+				const auto now = hi_res_clock::now();
+				if (std::chrono::duration_cast<milliseconds>(now - start).count() >= 5)
+					break;
+				Sleep(0);
+			}
+		}
+	};
+
+	std::thread t1{tf};
+	std::thread t2{tf};
+	std::thread t3{tf};
+	std::thread t4{tf};
+	std::thread t5{tf};
+	std::thread t6{tf};
+
+	t1.join();
+	t2.join();
+	t3.join();
+	t4.join();
+	t5.join();
+	t6.join();
+}
+
+int main(int argc, char* argv[])
 {
 	(void)argc;
 	(void)argv;
-	
-	hayai::ConsoleOutputter consoleOutputter;
-    hayai::Benchmarker::AddOutputter(consoleOutputter);
-	std::cout << "Running benchmarks...please wait while Hayai starts...\n";
-    hayai::Benchmarker::RunAllTests();
+
+	bench_hayai();
+	//threads_test();
 
 	std::cout << "\nMin time period used is " << perf::min_time_period() << "ms\n";
 
