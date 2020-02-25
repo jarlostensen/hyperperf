@@ -1,7 +1,11 @@
 
 #include "hayai/hayai.hpp"
+#include "perfutils.h"
+
 #include <chrono>
 #include <thread>
+#include <mutex>
+#include <vector>
 #include <iostream>
 
 using hi_res_clock = std::chrono::high_resolution_clock;
@@ -77,9 +81,14 @@ void bench_hayai()
 }
 
 void threads_test()
-{
-	const auto tf = []() {
-		for (auto n = 0u; n < 10000; ++n)
+{	
+	std::vector<double>	stats;
+	std::mutex stat_mtx;
+	
+	const auto tf = [&stats,&stat_mtx]() {
+		double stat = 0.0;
+		constexpr auto kRuns = 10000u;
+        for (auto n = 0u; n < kRuns; ++n)
 		{
 			const auto start = hi_res_clock::now();
 			for (;;)
@@ -89,22 +98,34 @@ void threads_test()
 					break;
 				Sleep(0);
 			}
+			const auto end = hi_res_clock::now();
+			stat += (end - start).count();
 		}
+		std::lock_guard<std::mutex> lock{stat_mtx};
+		stats.emplace_back(stat/kRuns);
 	};
 
-	std::thread t1{tf};
-	std::thread t2{tf};
-	std::thread t3{tf};
-	std::thread t4{tf};
-	std::thread t5{tf};
-	std::thread t6{tf};
+	std::vector<std::thread>	_threads;
+	std::cout << "creating/starting " << std::thread::hardware_concurrency() << " threads\n";
+	for(auto t = 0u; t < std::thread::hardware_concurrency(); ++t)
+	{
+	    _threads.emplace_back(tf);
+	}
 
-	t1.join();
-	t2.join();
-	t3.join();
-	t4.join();
-	t5.join();
-	t6.join();
+	std::cout << "waiting for threads to finish...";
+	for(auto & t : _threads)
+	{
+	    t.join();
+	}
+	std::cout << "done" << std::endl;
+
+	perf::RunningStat total_stat;
+	for(auto d : stats)
+	{
+	    total_stat.Push(d);
+	}
+
+	std::cout << "\tMean " << total_stat.Mean()/1000000 << "ms, standard deviation " << total_stat.StandardDeviation() << "ns\n";
 }
 
 int main(int argc, char* argv[])
@@ -112,8 +133,8 @@ int main(int argc, char* argv[])
 	(void)argc;
 	(void)argv;
 
-	bench_hayai();
-	//threads_test();
+	//bench_hayai();
+	threads_test();
 
 	std::cout << "\nMin time period used is " << perf::min_time_period() << "ms\n";
 
