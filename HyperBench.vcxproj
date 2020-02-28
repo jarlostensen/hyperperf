@@ -76,6 +76,8 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -88,6 +90,8 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -103,6 +107,8 @@
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -120,6 +126,8 @@
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -129,6 +137,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="hayai_tests.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>

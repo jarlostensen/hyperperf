@@ -5,6 +5,7 @@
 
 namespace perf
 {
+    
     // From https://en.cppreference.com/w/cpp/types/numeric_limits/epsilon
     template <class T>
     typename std::enable_if<!std::numeric_limits<T>::is_integer, bool>::type AlmostEqual(T x, T y, int ulp = 2)
