@@ -58,8 +58,8 @@ namespace perf
 
         Shape shape()
         {
-            const auto d1 = abs(median() - first_quartile());
-	        const auto d3 = abs(median() - third_quartile());
+            const double d1 = abs(median() - first_quartile());
+	        const double d3 = abs(median() - third_quartile());
 	        if(AlmostEqual(d1,d3))
                 return Shape::kSymmetric;
             return (d1 < d3) ? Shape::kLeft : Shape::kRight;

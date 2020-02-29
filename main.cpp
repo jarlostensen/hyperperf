@@ -8,6 +8,9 @@
 #include <vector>
 #include <iostream>
 
+#include <string>
+#include <map>
+
 namespace perf
 {
     TIMECAPS _time_caps = { 0 };
@@ -94,15 +97,18 @@ void threads_test()
 }
 
 
-int main(int argc, char* argv[])
-{
-    (void)argc;
-    (void)argv;
-
+int main()
+{    
     //bench_hayai();
     threads_test();
 
     std::cout << "\nMin time period used is " << perf::min_time_period() << "ms\n";
 
-    return 0;
+	std::map<std::string, int> m { {"first",1}, {"second", 2}, {"third", 3}};
+	for(const auto& [ key, val] : m)
+	{
+		std::cout << "{ " << key << ":" << val << "}\n";
+	}
+
+	return 0;
 }
