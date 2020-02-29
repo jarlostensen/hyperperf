@@ -57,6 +57,6 @@ BENCHMARK(SpinWait, SpinYield, 5, 1000)
         const auto now = hi_res_clock::now();
         if (std::chrono::duration_cast<milliseconds>(now - start).count() >= PERF_WAIT_TIME_MS)
             break;
-		std::this_thread::sleep_for(std::chrono::microseconds(1));
+		std::this_thread::yield();
     }
 }

@@ -8,6 +8,6 @@ set(CMAKE_CXX_EXTENSIONS ON)
 find_package (Threads REQUIRED)
 set(THREADS_PREFER_PTHREAD_FLAG TRUE)
 
-add_executable(hyperbench main.cpp hayai_tests.cpp)
+add_executable(hyperbench main.cpp hayai_tests.cpp thread_tests.cpp)
 target_link_libraries(hyperbench Threads::Threads)
 

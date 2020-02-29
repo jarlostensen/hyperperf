@@ -139,12 +139,14 @@
   <ItemGroup>
     <ClCompile Include="hayai_tests.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="thread_tests.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".gitignore" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="perfutils.h" />
+    <ClInclude Include="thread_tests.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="CMakeLists.txt" />

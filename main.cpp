@@ -1,16 +1,17 @@
 
 #include "hayai/hayai.hpp"
-#include "perfutils.h"
+#include "thread_tests.h"
 
 #include <chrono>
 #include <thread>
 #include <mutex>
 #include <vector>
+#include <ctime>
 #include <iostream>
 
 namespace perf
 {
-#ifdef WINDOWS
+#ifdef _WIN32
     TIMECAPS _time_caps = { 0 };
     auto min_time_period()
     {
@@ -19,18 +20,41 @@ namespace perf
         return unsigned(_time_caps.wPeriodMin);
     }
 #else
-	auto min_time_period()
+	auto min_time_period() -> unsigned
 	{
-		//TODO:
-		return 1u;
+		static unsigned _res = 0;
+		if(!_res)
+		{
+			clock_t t1, t2;			
+			t1 = t2 = clock();
+			while(t1==t2)
+			{
+				t2 = clock();
+			}
+			_res = unsigned(1000.0 * (double(t2)-double(t1))/CLOCKS_PER_SEC);
+		}
+		return _res;
 	}
-#endif
-}
+#endif 
 
-using hi_res_clock = std::chrono::high_resolution_clock;
-using milliseconds = std::chrono::milliseconds;
-using nanoseconds = std::chrono::nanoseconds;
-using microseconds = std::chrono::microseconds;
+	void print_info()
+	{		
+		std::cout << "System time caps:\n";
+	    std::cout << "\tclock measurement resolution " << perf::min_time_period() << "ms\n";
+
+#if !defined(_WIN32)
+		struct timespec res;
+		clock_getres(CLOCK_PROCESS_CPUTIME_ID, &res);
+		std::cout << "\tCLOCK_PROCESS_CPUTIME_ID: " << res.tv_sec << "s:" << res.tv_nsec << "ns\n";
+		clock_getres(CLOCK_REALTIME, &res);
+		std::cout << "\tCLOCK_REALTIME: " << res.tv_sec << "s:" << res.tv_nsec << "ns\n";
+		clock_getres(CLOCK_REALTIME_COARSE, &res);
+		std::cout << "\tCLOCK_REALTIME_COARSE: " << res.tv_sec << "s:" << res.tv_nsec << "ns\n";
+		clock_getres(CLOCK_MONOTONIC, &res);
+		std::cout << "\tCLOCK_MONOTONIC: " << res.tv_sec << "s:" << res.tv_nsec << "ns\n";
+#endif
+	}
+}
 
 void bench_hayai()
 {
@@ -40,74 +64,12 @@ void bench_hayai()
     hayai::Benchmarker::RunAllTests();
 }
 
-void threads_test()
-{
-    std::vector<double>	stats;
-    std::mutex stat_mtx;
-
-    const auto tf = [&stats, &stat_mtx]() {
-        double stat = 0.0;
-        constexpr auto kRuns = 4000u;
-        for (auto n = 0u; n < kRuns; ++n)
-        {
-            const auto start = hi_res_clock::now();
-            for (;;)
-            {
-                const auto now = hi_res_clock::now();
-                if (std::chrono::duration_cast<milliseconds>(now - start).count() >= 5)
-                    break;
-				std::this_thread::sleep_for(std::chrono::microseconds(1));
-            }
-            const auto end = hi_res_clock::now();
-            stat += (end - start).count();
-        }
-        std::lock_guard<std::mutex> lock{ stat_mtx };
-        stats.emplace_back(stat / kRuns);
-    };
-
-    std::vector<std::thread>	_threads;
-    std::cout << "creating/starting " << std::thread::hardware_concurrency() << " threads\n";
-    for (auto t = 0u; t < std::thread::hardware_concurrency(); ++t)
-    {
-        _threads.emplace_back(tf);
-    }
-
-    std::cout << "waiting for threads to finish...";
-    for (auto& t : _threads)
-    {
-        t.join();
-    }
-    std::cout << "done" << std::endl;
-
-    perf::RunningStat total_stat;
-    for (auto d : stats)
-    {
-        total_stat.push(d);
-    }
-
-    std::cout << "\tMean " << total_stat.mean() / 1000000 << "ms, standard deviation " << total_stat.stdev() / 1000 << "us\n";
-    std::cout << "\tMedian " << total_stat.median() / 1000000 << "ms, 1st quartile " << total_stat.first_quartile() / 1000000 << "ms, 3rd quartile " << total_stat.third_quartile() / 1000000 << "ms" << std::endl;
-    switch (total_stat.shape())
-    {
-    case perf::Stats::Shape::kSymmetric:
-        std::cout << "\tdistribution is ~symmetric\n";
-        break;
-    case perf::Stats::Shape::kLeft:
-        std::cout << "\tdistribution is skewed towards the first quartile\n";
-        break;
-    case perf::Stats::Shape::kRight:
-        std::cout << "\tdistribution is skewed towards the third quartile\n";
-        break;
-    }
-}
-
-
 int main()
 {    
+	perf::print_info();
+	perf::threads::test_ht_workers();
     //bench_hayai();
-    threads_test();
-
-    std::cout << "\nMin time period used is " << perf::min_time_period() << "ms\n";
+    //perf::threads::test_wait_loops();
 
 	return 0;
 }

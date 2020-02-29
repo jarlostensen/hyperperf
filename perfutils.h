@@ -2,6 +2,7 @@
 #include <type_traits>
 #include <limits>
 #include <algorithm>
+#include <cmath>
 
 namespace perf
 {

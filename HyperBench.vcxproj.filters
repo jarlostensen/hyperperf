@@ -21,12 +21,18 @@
     <ClCompile Include="hayai_tests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="thread_tests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include=".gitignore" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="perfutils.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="thread_tests.h">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>
