@@ -1,5 +1,6 @@
 #include "hayai/hayai.hpp"
 #include <chrono>
+#include <thread>
 
 using hi_res_clock = std::chrono::high_resolution_clock;
 using milliseconds = std::chrono::milliseconds;
@@ -56,8 +57,6 @@ BENCHMARK(SpinWait, SpinYield, 5, 1000)
         const auto now = hi_res_clock::now();
         if (std::chrono::duration_cast<milliseconds>(now - start).count() >= PERF_WAIT_TIME_MS)
             break;
-#ifdef WINDOWS
-        Sleep(0);
-#endif
+		std::this_thread::sleep_for(std::chrono::microseconds(1));
     }
 }

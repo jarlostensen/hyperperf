@@ -8,9 +8,6 @@
 #include <vector>
 #include <iostream>
 
-#include <string>
-#include <map>
-
 namespace perf
 {
 #ifdef WINDOWS
@@ -59,9 +56,7 @@ void threads_test()
                 const auto now = hi_res_clock::now();
                 if (std::chrono::duration_cast<milliseconds>(now - start).count() >= 5)
                     break;
-#ifdef WINDOWS
-                Sleep(0);
-#endif
+				std::this_thread::sleep_for(std::chrono::microseconds(1));
             }
             const auto end = hi_res_clock::now();
             stat += (end - start).count();
