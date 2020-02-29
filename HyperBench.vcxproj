@@ -145,7 +145,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="perfutils.h" />
-    <ClInclude Include="threads.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="CMakeLists.txt" />

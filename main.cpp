@@ -13,13 +13,21 @@
 
 namespace perf
 {
+#ifdef WINDOWS
     TIMECAPS _time_caps = { 0 };
-    UINT min_time_period()
+    auto min_time_period()
     {
         if (!_time_caps.wPeriodMin)
             timeGetDevCaps(&_time_caps, sizeof(_time_caps));
-        return _time_caps.wPeriodMin;
+        return unsigned(_time_caps.wPeriodMin);
     }
+#else
+	auto min_time_period()
+	{
+		//TODO:
+		return 1u;
+	}
+#endif
 }
 
 using hi_res_clock = std::chrono::high_resolution_clock;
@@ -51,7 +59,9 @@ void threads_test()
                 const auto now = hi_res_clock::now();
                 if (std::chrono::duration_cast<milliseconds>(now - start).count() >= 5)
                     break;
+#ifdef WINDOWS
                 Sleep(0);
+#endif
             }
             const auto end = hi_res_clock::now();
             stat += (end - start).count();
@@ -103,12 +113,6 @@ int main()
     threads_test();
 
     std::cout << "\nMin time period used is " << perf::min_time_period() << "ms\n";
-
-	std::map<std::string, int> m { {"first",1}, {"second", 2}, {"third", 3}};
-	for(const auto& [ key, val] : m)
-	{
-		std::cout << "{ " << key << ":" << val << "}\n";
-	}
 
 	return 0;
 }

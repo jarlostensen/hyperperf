@@ -10,9 +10,10 @@ using microseconds = std::chrono::microseconds;
 
 namespace perf
 {
-    extern UINT min_time_period();
+    extern unsigned min_time_period();
 }
 
+#ifdef WINDOWS
 BENCHMARK(Wait, SleepSystemRes, 5, 10)
 {
     Sleep(PERF_WAIT_TIME_MS);
@@ -34,6 +35,7 @@ BENCHMARK_F(sleep_hires_fixture, SleepHiRes, 5, 10)
 {
     Sleep(PERF_WAIT_TIME_MS);
 }
+#endif 
 
 BENCHMARK(SpinWait, SpinHot, 5, 1000)
 {
@@ -54,6 +56,8 @@ BENCHMARK(SpinWait, SpinYield, 5, 1000)
         const auto now = hi_res_clock::now();
         if (std::chrono::duration_cast<milliseconds>(now - start).count() >= PERF_WAIT_TIME_MS)
             break;
+#ifdef WINDOWS
         Sleep(0);
+#endif
     }
 }
