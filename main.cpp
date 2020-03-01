@@ -43,6 +43,7 @@ namespace perf
 	{
 		size_t		_phys_cores = 1;
 		size_t		_num_cores = 1;
+		size_t		_topology_levels = 1;
 		bool		_ht = false;
 	};
 
@@ -61,7 +62,31 @@ namespace perf
     	_vendor_string[12] = 0;
 		std::cout << "cpuid vendor \"" << _vendor_string << "\"\n";
 
+		//NOTE: for the time being following https://software.intel.com/sites/default/files/managed/ba/f1/intel-64-architecture-processor-topology-enumeration.pdf
+		//		which strangely does *not* cover leaf 0x1f
+		const auto max_leaf = cpu_id.eax();
+		if(max_leaf < 0xb)
+		{		
+			std::cerr << "max leaf < 0xb: ";
+			//TODO: fallback for (really) old hardware...
+		until_a_better_path_exists:
+			std::cerr << "CPUID doesn't support leaf 0xb. Not sure how to deal with that now\n";
+			return;
+		}
+		// check if it's properly supported
+		cpu_id.ecx() = 0;
+		cpu_id = 0xb;
+		if(cpu_id.ebx()==0)
+		{
+			goto until_a_better_path_exists;
+		}
+		
 		cpu_id = 1;
+		if ( !cpu_id.bits_set(cpuid::Register::ebx, 0xff00) )
+		{
+			std::cout << "hierarchy has only one topology level\n";
+			_proc_info._topology_levels = 1;
+		}
 		_proc_info._ht = cpu_id.bits_set(cpuid::Register::edx, 1<<28);
 		if(_proc_info._ht)
 		{
