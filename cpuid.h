@@ -30,7 +30,7 @@ namespace system_info
 #ifdef _WIN32
 			__cpuid(_regs, leaf);
 #else
-			__cpuid(leaf, regs[0], regs[1], regs[2], _regs[3]);
+			__cpuid(leaf, _regs[0], _regs[1], _regs[2], _regs[3]);
 #endif
 			return *this;
 		}
