@@ -77,6 +77,16 @@ namespace perf::threads
 		}
 	}
 
+	bool has_ht_cores()
+	{
+
+	}
+
+	void bind_to_ht_core(std::thread& t1, std::thread& t2)
+	{
+		
+	}
+
 	void test_ht_workers()
 	{
 #ifdef _WIN32

@@ -9,6 +9,8 @@
 #include <ctime>
 #include <iostream>
 
+#include <cpuid.h>
+
 namespace perf
 {
 #ifdef _WIN32
@@ -37,8 +39,38 @@ namespace perf
 	}
 #endif 
 
+	// https://wiki.osdev.org/Detecting_CPU_Topology_(80x86)
 	void print_info()
-	{		
+	{	
+		int numCores = 0;	
+		int numLogical = 0;
+#ifdef _WIN32
+		//TODO:
+#else		
+		unsigned int eax=0,ebx=0,ecx=0,edx=0;
+
+		__cpuid(0x1,eax,ebx,ecx,edx);
+		if((edx&(1<<28))==(1<<28))
+		{
+			//WIP: determine processor topology
+			std::cout << "HT enabled\n";
+			// Intel IA Dev Guide, Table 3.8
+			__cpuid(0x1f,eax=0x1f,ebx,ecx,edx);
+			std::cout << "eax = " << eax << " ebx = " << ebx << " ecx = " << ecx << " edx = " << edx << "\n";
+			//const auto logical_CPU_bits = ecx;
+			//__cpuid(0xb,eax=0xb,ebx,ecx = 1,edx);
+			//std::cout << "eax = " << eax << " ebx = " << ebx << " ecx = " << ecx << " edx = " << edx << "\n";
+			//numCores = ecx - logical_CPU_bits;
+			//numLogical = ebx;
+		}
+		else
+		{
+			std::cout << "No HT support\n";
+			numCores = numLogical = std::thread::hardware_concurrency();
+		}		
+#endif
+		std::cout << numCores << " physical cores available, " << numLogical << " logical\n";
+		
 		std::cout << "System time caps:\n";
 	    std::cout << "\tclock measurement resolution " << perf::min_time_period() << "ms\n";
 
