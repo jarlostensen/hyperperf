@@ -39,38 +39,61 @@ namespace perf
 	}
 #endif 
 
+	struct processor_info_t
+	{
+		size_t		_phys_cores = 1;
+		size_t		_num_cores = 1;
+		bool		_ht = false;
+	};
+
+	processor_info_t _proc_info;
+
+	void init_processor_info()
+	{
+		unsigned int eax, ebx, ecx, edx;
+		//__cpuid(0x1,eax=0,ebx=0,ecx=0,edx=0);
+		char _vendor_string[13];
+		__cpuid(0, eax, ebx, ecx, edx);
+    	memcpy(_vendor_string + 0, &ebx, sizeof(ebx));
+    	memcpy(_vendor_string + 4, &edx, sizeof(edx));
+    	memcpy(_vendor_string + 8, &ecx, sizeof(ecx));
+    	_vendor_string[12] = 0;
+		std::cout << "cpuid vendor \"" << _vendor_string << "\"\n";
+		__cpuid(1, eax, ebx, ecx, edx);		
+		_proc_info._ht = (edx&(1<<28))==(1<<28);
+		if(_proc_info._ht)
+		{
+			std::cout << "hyperthreading enabled\n";
+
+			// Inte IA Dev guide, table 3.8
+			__cpuid(0x1f, eax, ebx, ecx=0, edx);
+			if(!eax && !ebx && !ecx &&!edx)
+			{
+				// unsupported, try 0xb
+				__cpuid(0xb, eax, ebx, ecx = 1, edx);
+				if(!eax && !ebx && !ecx &&!edx)
+				{
+					std::cerr << "unable to determine processor topology\n";
+					return;
+				}
+			}
+			//TODO: this isn't strictly correct, ebx is the number of logical processors "at this level"
+			_proc_info._phys_cores = edx;
+			_proc_info._num_cores = ebx;
+		}
+
+		std::cout << "phys cores " << _proc_info._phys_cores << ", logical cores " << _proc_info._num_cores << "\n";
+	}
+
+	void set_thread_affinity(std::thread& t, size_t phys_core)
+	{
+		assert(phys_core<_proc_info._phys_cores);
+		
+	}
+
 	// https://wiki.osdev.org/Detecting_CPU_Topology_(80x86)
 	void print_info()
 	{	
-		int numCores = 0;	
-		int numLogical = 0;
-#ifdef _WIN32
-		//TODO:
-#else		
-		unsigned int eax=0,ebx=0,ecx=0,edx=0;
-
-		__cpuid(0x1,eax,ebx,ecx,edx);
-		if((edx&(1<<28))==(1<<28))
-		{
-			//WIP: determine processor topology
-			std::cout << "HT enabled\n";
-			// Intel IA Dev Guide, Table 3.8
-			__cpuid(0x1f,eax=0x1f,ebx,ecx,edx);
-			std::cout << "eax = " << eax << " ebx = " << ebx << " ecx = " << ecx << " edx = " << edx << "\n";
-			//const auto logical_CPU_bits = ecx;
-			//__cpuid(0xb,eax=0xb,ebx,ecx = 1,edx);
-			//std::cout << "eax = " << eax << " ebx = " << ebx << " ecx = " << ecx << " edx = " << edx << "\n";
-			//numCores = ecx - logical_CPU_bits;
-			//numLogical = ebx;
-		}
-		else
-		{
-			std::cout << "No HT support\n";
-			numCores = numLogical = std::thread::hardware_concurrency();
-		}		
-#endif
-		std::cout << numCores << " physical cores available, " << numLogical << " logical\n";
-		
 		std::cout << "System time caps:\n";
 	    std::cout << "\tclock measurement resolution " << perf::min_time_period() << "ms\n";
 
@@ -103,6 +126,7 @@ void bench_hayai()
 
 int main()
 {    
+	perf::init_processor_info();
 	perf::print_info();
 	perf::threads::test_ht_workers();
     //bench_hayai();
