@@ -48,8 +48,13 @@ namespace perf
 		std::cout << "\tCLOCK_PROCESS_CPUTIME_ID: " << res.tv_sec << "s:" << res.tv_nsec << "ns\n";
 		clock_getres(CLOCK_REALTIME, &res);
 		std::cout << "\tCLOCK_REALTIME: " << res.tv_sec << "s:" << res.tv_nsec << "ns\n";
+#ifndef __MACH__
 		clock_getres(CLOCK_REALTIME_COARSE, &res);
 		std::cout << "\tCLOCK_REALTIME_COARSE: " << res.tv_sec << "s:" << res.tv_nsec << "ns\n";
+#else
+		clock_getres(CLOCK_REALTIME, &res); 
+		std::cout << "\tCLOCK_REALTIME: " << res.tv_sec << "s:" << res.tv_nsec << "ns\n";
+#endif
 		clock_getres(CLOCK_MONOTONIC, &res);
 		std::cout << "\tCLOCK_MONOTONIC: " << res.tv_sec << "s:" << res.tv_nsec << "ns\n";
 #endif
