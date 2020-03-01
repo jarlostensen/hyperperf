@@ -9,7 +9,7 @@
 #include <ctime>
 #include <iostream>
 
-#include <cpuid.h>
+#include "cpuid.h"
 
 namespace perf
 {
@@ -50,36 +50,41 @@ namespace perf
 
 	void init_processor_info()
 	{
-		unsigned int eax, ebx, ecx, edx;
-		//__cpuid(0x1,eax=0,ebx=0,ecx=0,edx=0);
+		using namespace system_info;
+
+		cpuid cpu_id;
 		char _vendor_string[13];
-		__cpuid(0, eax, ebx, ecx, edx);
-    	memcpy(_vendor_string + 0, &ebx, sizeof(ebx));
-    	memcpy(_vendor_string + 4, &edx, sizeof(edx));
-    	memcpy(_vendor_string + 8, &ecx, sizeof(ecx));
+		cpu_id = 0;
+    	memcpy(_vendor_string + 0, &cpu_id.ebx(), sizeof(int));
+    	memcpy(_vendor_string + 4, &cpu_id.edx(), sizeof(int));
+    	memcpy(_vendor_string + 8, &cpu_id.ecx(), sizeof(int));
     	_vendor_string[12] = 0;
 		std::cout << "cpuid vendor \"" << _vendor_string << "\"\n";
-		__cpuid(1, eax, ebx, ecx, edx);		
-		_proc_info._ht = (edx&(1<<28))==(1<<28);
+
+		cpu_id = 1;
+		_proc_info._ht = cpu_id.bits_set(cpuid::Register::edx, 1<<28);
 		if(_proc_info._ht)
 		{
 			std::cout << "hyperthreading enabled\n";
 
 			// Inte IA Dev guide, table 3.8
-			__cpuid(0x1f, eax, ebx, ecx=0, edx);
-			if(!eax && !ebx && !ecx &&!edx)
+			cpu_id.ecx() = 0;
+			cpu_id = 0x1f;
+			if(!cpu_id.is_ok())
 			{
 				// unsupported, try 0xb
-				__cpuid(0xb, eax, ebx, ecx = 1, edx);
-				if(!eax && !ebx && !ecx &&!edx)
+				cpu_id.ecx() = 1;
+				cpu_id = 0x0b;
+
+				if(!cpu_id.is_ok())
 				{
 					std::cerr << "unable to determine processor topology\n";
 					return;
 				}
 			}
 			//TODO: this isn't strictly correct, ebx is the number of logical processors "at this level"
-			_proc_info._phys_cores = edx;
-			_proc_info._num_cores = ebx;
+			_proc_info._phys_cores = cpu_id.edx();
+			_proc_info._num_cores = cpu_id.ebx();
 		}
 
 		std::cout << "phys cores " << _proc_info._phys_cores << ", logical cores " << _proc_info._num_cores << "\n";
@@ -87,8 +92,8 @@ namespace perf
 
 	void set_thread_affinity(std::thread& t, size_t phys_core)
 	{
-		assert(phys_core<_proc_info._phys_cores);
-		
+		(void)t;
+		(void)phys_core;
 	}
 
 	// https://wiki.osdev.org/Detecting_CPU_Topology_(80x86)

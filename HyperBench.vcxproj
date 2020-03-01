@@ -145,6 +145,7 @@
     <None Include=".gitignore" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="cpuid.h" />
     <ClInclude Include="perfutils.h" />
     <ClInclude Include="thread_tests.h" />
   </ItemGroup>
