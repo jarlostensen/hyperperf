@@ -49,6 +49,11 @@ namespace perf
 
 	processor_info_t _proc_info;
 
+	std::ostream& operator<<(std::ostream& os, system_info::cpuid& cpuid_)
+	{
+	    return os << std::hex << "[eax:0x" << cpuid_.eax() << ", ebx:0x" << cpuid_.ebx() << ", ecx:0x" << cpuid_.ecx() << ", edx:0x" << cpuid_.ebx() << "]";
+	}
+
 	void init_processor_info()
 	{
 		using namespace system_info;
@@ -73,11 +78,14 @@ namespace perf
 			std::cerr << "CPUID doesn't support leaf 0xb. Not sure how to deal with that now\n";
 			return;
 		}
+
 		// check if it's properly supported
 		cpu_id.ecx() = 0;
 		cpu_id = 0xb;
+		std::cerr << cpu_id << "\n";
 		if(cpu_id.ebx()==0)
 		{
+			//std::cerr << cpu_id << "\n";
 			goto until_a_better_path_exists;
 		}
 		
@@ -158,7 +166,7 @@ int main()
 {    
 	perf::init_processor_info();
 	perf::print_info();
-	perf::threads::test_ht_workers();
+	//perf::threads::test_ht_workers();
     //bench_hayai();
     //perf::threads::test_wait_loops();
 

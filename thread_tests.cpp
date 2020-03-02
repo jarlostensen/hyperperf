@@ -79,7 +79,7 @@ namespace perf::threads
 
 	bool has_ht_cores()
 	{
-
+		return false;
 	}
 
 	void bind_to_ht_core(std::thread& t1, std::thread& t2)
