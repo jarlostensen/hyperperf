@@ -6,8 +6,21 @@ namespace system_info
 #ifdef _WIN32
 #include <intrin.h>
 #else
-#include <cpuid.h>
+	static void __cpuid(int info[4], int infoType) {
+		__asm__ __volatile__("cpuid" : "=a"(info[0]), "=b"(info[1]), "=c"(info[2]), "=d"(info[3]) : "0"(infoType));
+	}
+
+	/* Save %ebx in case it's the PIC register */
+	static void __cpuidex(int info[4], int level, int count) {
+		__asm__ __volatile__("xchg{l}\t{%%}ebx, %1\n\t"
+							"cpuid\n\t"
+							"xchg{l}\t{%%}ebx, %1\n\t"
+							: "=a"(info[0]), "=r"(info[1]), "=c"(info[2]), "=d"(info[3])
+							: "0"(level), "2"(count));
+	}	
 #endif
+
+	
     // cross platform convenience wrapper for cpuid
     // usage:
     // cpuid cpu_id{1};
@@ -17,7 +30,7 @@ namespace system_info
     // 
     //
     struct cpuid
-    {
+    {		
         cpuid() = default;
 
         explicit cpuid(int leaf)
@@ -27,31 +40,15 @@ namespace system_info
 
         cpuid& operator=(int leaf)
         {
-#ifdef _WIN32
             __cpuid(reinterpret_cast<int*>(_regs), leaf);
-#else
-            // see for example http://newbiz.github.io/cpp/2010/12/20/Playing-with-cpuid.html
-            asm volatile (
-                "cpuid"
-                : "=a"(_regs[0]), "=b"(_regs[1]), "=c"(_regs[2]), "=d"(_regs[3])
-                : "a"(leaf)
-                : "b"
-                );
-
-            uint32_t eax, ebx, ecx, edx;
-# if defined( __i386__ ) && defined ( __PIC__ )
-            /* in case of PIC under 32-bit EBX cannot be clobbered */
-            __asm__ volatile ("movl %%ebx, %%edi \n\t cpuid \n\t xchgl %%ebx, %%edi" : "=D" (ebx),
-# else
-            __asm__ volatile ("cpuid" : "+r" (ebx),
-# endif
-                "+a" (eax), "+c" (ecx), "=d" (edx));
-
-            _regs[0] = eax; _regs[1] = ebx; _regs[2] = ecx; _regs[3] = edx;
-
-#endif
             return *this;
         }
+
+		cpuid& operator=(std::pair<int,int>&& leafSubLeaf)
+		{
+            __cpuidex(reinterpret_cast<int*>(_regs), leafSubLeaf.first, leafSubLeaf.second);
+			return *this;
+		}
 
         void clear_regs()
         {
@@ -90,6 +87,12 @@ namespace system_info
         {
             return _regs[static_cast<size_t>(r)];
         }
+		
+		unsigned int extract_reg_field(Register r, size_t bitOffset, size_t bitWidth) const
+		{
+			const auto rval = _regs[static_cast<size_t>(r)];
+			return ((rval >> bitOffset) & ((1<<bitWidth)-1));
+		}
 
         // test register against bit mask
         // returns reg & mask
