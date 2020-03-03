@@ -55,7 +55,7 @@ namespace system_info
             memset(_regs, 0, sizeof(_regs));
         }
 
-        enum class Register
+        enum class regs
         {
             eax = 0,
             ebx,
@@ -83,12 +83,12 @@ namespace system_info
             return _regs[3];
         }
 
-        unsigned int reg(Register r) const
+        unsigned int reg(regs r) const
         {
             return _regs[static_cast<size_t>(r)];
         }
 		
-		unsigned int extract_reg_field(Register r, size_t bitOffset, size_t bitWidth) const
+		unsigned int extract_reg_field(regs r, size_t bitOffset, size_t bitWidth) const
 		{
 			const auto rval = _regs[static_cast<size_t>(r)];
 			return ((rval >> bitOffset) & ((1<<bitWidth)-1));
@@ -96,7 +96,7 @@ namespace system_info
 
         // test register against bit mask
         // returns reg & mask
-        bool bits_set(Register r, unsigned int mask) const
+        bool bits_set(regs r, unsigned int mask) const
         {
             return (_regs[static_cast<size_t>(r)] & mask) != 0;
         }

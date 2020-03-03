@@ -44,7 +44,19 @@ namespace perf
 		size_t		_phys_cores = 1;
 		size_t		_num_cores = 1;
 		size_t		_topology_levels = 1;
-		bool		_ht = false;
+		unsigned	_smt_mask_width = 0;
+		unsigned	_core_mask_width = 0;
+		struct
+		{
+		    bool	_ht:1;
+			bool	_b_leaf:1;
+			bool	_1f_leaf:1;
+		} _cpuid_caps;
+#
+        unsigned smt_select_mask() const
+        {
+            return ~((-1)<<_smt_mask_width);
+        }
 	};
 
 	processor_info_t _proc_info;
@@ -68,55 +80,49 @@ namespace perf
 		std::cout << "cpuid vendor \"" << _vendor_string << "\"\n";		
 
 		cpu_id = 1;
-		_proc_info._ht = cpu_id.bits_set(cpuid::Register::edx, 1<<28);
+		_proc_info._cpuid_caps._ht = cpu_id.bits_set(cpuid::regs::edx, 1<<28);
 		
 		//NOTE: for the time being following https://software.intel.com/sites/default/files/managed/ba/f1/intel-64-architecture-processor-topology-enumeration.pdf
 		//		which strangely does *not* cover leaf 0x1f
 		const auto max_leaf = cpu_id.eax();
 		if(max_leaf < 0xb)
-		{		
+		{
 			std::cerr << "max leaf < 0xb: ";
 			//TODO: fallback for (really) old hardware...
-		until_a_better_path_exists:
 			std::cerr << "CPUID doesn't support leaf 0xb. Not sure how to deal with that now\n";
 			return;
 		}
 
 		// check if it's properly supported
 		cpu_id = {0xb,0};		
-		if(cpu_id.ebx()==0)
-		{
-			//std::cerr << cpu_id << "\n";
-			goto until_a_better_path_exists;
-		}
-		
-		cpu_id = {0x0b,1};
-		if ( !cpu_id.bits_set(cpuid::Register::ebx, 0xff00) )
-		{
-			std::cout << "hierarchy has only one topology level\n";
-			_proc_info._topology_levels = 1;
-		}
-		
-		if(_proc_info._ht)
-		{
-			std::cout << "hyperthreading enabled\n";
+		_proc_info._cpuid_caps._b_leaf = cpu_id.ebx()!=0;
+		cpu_id = {0x1f,0};
+		_proc_info._cpuid_caps._1f_leaf = cpu_id.ebx()!=0;
 
-			// Inte IA Dev guide, table 3.8
-			cpu_id = {0x1f, 0};
-			if(!cpu_id.is_ok())
+		if(_proc_info._cpuid_caps._1f_leaf)
+		{
+		    //TODO:
+		}
+		else if ( _proc_info._cpuid_caps._b_leaf )
+		{
+			constexpr unsigned kSubLeaf_SMTLevel = 0;
+			constexpr unsigned kSubLeaf_ProcessorCore = 1;
+			
+		    cpu_id = {0xb,kSubLeaf_SMTLevel};
+			if(cpu_id.extract_reg_field(cpuid::regs::ecx, 8, 15)==1)
 			{
-				// unsupported, try 0xb
-				cpu_id = {0x0b,1};
+			    _proc_info._smt_mask_width = cpu_id.extract_reg_field(cpuid::regs::eax, 0, 4);
 
-				if(!cpu_id.is_ok())
+				cpu_id = {0xb,kSubLeaf_ProcessorCore};
+				if(cpu_id.extract_reg_field(cpuid::regs::ecx, 8, 15) == 2 )
 				{
-					std::cerr << "unable to determine processor topology\n";
-					return;
+				    _proc_info._core_mask_width = cpu_id.extract_reg_field(cpuid::regs::eax, 0, 4);
+					//ZZZ:
+					_proc_info._phys_cores = 1<<_proc_info._core_mask_width;
 				}
+				//ZZZ:
+				_proc_info._num_cores = _proc_info._phys_cores * (1<<_proc_info._smt_mask_width);
 			}
-			//TODO: this isn't strictly correct, ebx is the number of logical processors "at this level"
-			_proc_info._phys_cores = cpu_id.edx();
-			_proc_info._num_cores = cpu_id.ebx();
 		}
 
 		std::cout << "phys cores " << _proc_info._phys_cores << ", logical cores " << _proc_info._num_cores << "\n";
