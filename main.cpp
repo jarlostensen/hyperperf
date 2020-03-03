@@ -87,7 +87,6 @@ namespace perf
 		const auto max_leaf = cpu_id.eax();
 		if(max_leaf < 0xb)
 		{
-			std::cerr << "max leaf < 0xb: ";
 			//TODO: fallback for (really) old hardware...
 			std::cerr << "CPUID doesn't support leaf 0xb. Not sure how to deal with that now\n";
 			return;
@@ -98,31 +97,66 @@ namespace perf
 		_proc_info._cpuid_caps._b_leaf = cpu_id.ebx()!=0;
 		cpu_id = {0x1f,0};
 		_proc_info._cpuid_caps._1f_leaf = cpu_id.ebx()!=0;
-
-		if(_proc_info._cpuid_caps._1f_leaf)
+		
+		constexpr unsigned kSubLeaf_SMTLevel = 0;
+		constexpr unsigned kSubLeaf_ProcessorCore = 1;
+			
+		if(!_proc_info._cpuid_caps._1f_leaf)
 		{
-		    //TODO:
+			//zzz: this is not right...at all...not on my Mac at least
+
+		    std::cout << "1f leaf\n";
+			cpu_id = {0x1f,kSubLeaf_SMTLevel};
+			std::cout << "leaf 0 " << cpu_id << "\n";
+			std::cout << cpu_id.extract_reg_field(cpuid::regs::ecx,0,7) << "\n";
+
+			_proc_info._smt_mask_width = cpu_id.extract_reg_field(cpuid::regs::eax, 0, 4);
+			//NOTE: IA Dev manual states this number isn't reliable
+			const auto num_smt_cores = cpu_id.extract_reg_field(cpuid::regs::ebx, 0,15);
+			cpu_id = {0x1f,kSubLeaf_ProcessorCore};
+			std::cout << "leaf 1 " << cpu_id << "\n";
+			_proc_info._core_mask_width = cpu_id.extract_reg_field(cpuid::regs::eax, 0, 4);			
+
 		}
 		else if ( _proc_info._cpuid_caps._b_leaf )
-		{
-			constexpr unsigned kSubLeaf_SMTLevel = 0;
-			constexpr unsigned kSubLeaf_ProcessorCore = 1;
-			
-		    cpu_id = {0xb,kSubLeaf_SMTLevel};
-			if(cpu_id.extract_reg_field(cpuid::regs::ecx, 8, 15)==1)
+		{			
+			std::cout << "b leaf\n";
+			auto level_type = 0u;
+			auto level_shift = 0u;
+			auto smt_count = 0u;
+			auto core_count = 0u;
+			for(auto sub_leaf = kSubLeaf_SMTLevel; ;++sub_leaf)
 			{
-			    _proc_info._smt_mask_width = cpu_id.extract_reg_field(cpuid::regs::eax, 0, 4);
-
-				cpu_id = {0xb,kSubLeaf_ProcessorCore};
-				if(cpu_id.extract_reg_field(cpuid::regs::ecx, 8, 15) == 2 )
+				cpu_id = {0xb,sub_leaf};
+				if(!cpu_id.ebx())
 				{
-				    _proc_info._core_mask_width = cpu_id.extract_reg_field(cpuid::regs::eax, 0, 4);
-					//ZZZ:
-					_proc_info._phys_cores = 1<<_proc_info._core_mask_width;
+					// done 
+					break;
 				}
-				//ZZZ:
-				_proc_info._num_cores = _proc_info._phys_cores * (1<<_proc_info._smt_mask_width);
+				level_type = cpu_id.extract_reg_field(cpuid::regs::ecx, 8, 15);
+				level_shift = cpu_id.extract_reg_field(cpuid::regs::eax, 0, 4);
+				switch(level_type)
+				{
+					case 1:
+					{
+						// SMT
+						_proc_info._smt_mask_width = level_shift;
+						smt_count += cpu_id.extract_reg_field(cpuid::regs::ebx, 0,15);
+						std::cout << "SMT " << level_shift << "\n";
+					}
+					break;
+					case 2:
+					{
+						// core
+						_proc_info._core_mask_width = level_shift;
+						core_count += cpu_id.extract_reg_field(cpuid::regs::ebx, 0,15);
+						std::cout << "core " << level_shift << "\n";
+					}
+					break;
+				}
 			}
+			_proc_info._phys_cores = core_count;
+			_proc_info._num_cores = smt_count * core_count;
 		}
 
 		std::cout << "phys cores " << _proc_info._phys_cores << ", logical cores " << _proc_info._num_cores << "\n";

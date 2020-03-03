@@ -88,10 +88,11 @@ namespace system_info
             return _regs[static_cast<size_t>(r)];
         }
 		
-		unsigned int extract_reg_field(regs r, size_t bitOffset, size_t bitWidth) const
+		// Intel notation; [MSB:LSB]
+		unsigned int extract_reg_field(regs r, size_t startBitIndex, size_t endBitIndex) const
 		{
 			const auto rval = _regs[static_cast<size_t>(r)];
-			return ((rval >> bitOffset) & ((1<<bitWidth)-1));
+			return ((rval >> startBitIndex) & ((1<<(endBitIndex+1))-1));
 		}
 
         // test register against bit mask
