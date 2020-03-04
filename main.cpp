@@ -101,10 +101,9 @@ namespace perf
 		constexpr unsigned kSubLeaf_SMTLevel = 0;
 		constexpr unsigned kSubLeaf_ProcessorCore = 1;
 			
+		//zzz: this is not right...at all...not on my Mac at least
 		if(!_proc_info._cpuid_caps._1f_leaf)
 		{
-			//zzz: this is not right...at all...not on my Mac at least
-
 		    std::cout << "1f leaf\n";
 			cpu_id = {0x1f,kSubLeaf_SMTLevel};
 			std::cout << "leaf 0 " << cpu_id << "\n";
@@ -125,6 +124,8 @@ namespace perf
 			auto level_shift = 0u;
 			auto smt_count = 0u;
 			auto core_count = 0u;
+			_proc_info._phys_cores = 0;
+			_proc_info._num_cores = 0;
 			for(auto sub_leaf = kSubLeaf_SMTLevel; ;++sub_leaf)
 			{
 				cpu_id = {0xb,sub_leaf};
@@ -141,25 +142,26 @@ namespace perf
 					{
 						// SMT
 						_proc_info._smt_mask_width = level_shift;
-						smt_count += cpu_id.extract_reg_field(cpuid::regs::ebx, 0,15);
-						std::cout << "SMT " << level_shift << "\n";
+						//std::cout << "SMT " << level_shift << ", 2xAPIC id " << cpu_id.edx() << "\n";
 					}
 					break;
 					case 2:
 					{
 						// core
+						//NOTE: this level shift includes the SMT shift (see Intel docs)
 						_proc_info._core_mask_width = level_shift;
-						core_count += cpu_id.extract_reg_field(cpuid::regs::ebx, 0,15);
-						std::cout << "core " << level_shift << "\n";
+						// remove SMT part
+						_proc_info._num_cores += (level_shift >> _proc_info._smt_mask_width);
+						++core_count;
+						//std::cout << "core " << level_shift << ", 2xAPIC id " << cpu_id.edx() << "\n";
 					}
 					break;
 				}
 			}
-			_proc_info._phys_cores = core_count;
-			_proc_info._num_cores = smt_count * core_count;
+			_proc_info._phys_cores = core_count;			
 		}
 
-		std::cout << "phys cores " << _proc_info._phys_cores << ", logical cores " << _proc_info._num_cores << "\n";
+		std::cout << "phys cores (processors) " << _proc_info._phys_cores << ", logical cores " << _proc_info._num_cores << "\n";
 	}
 
 	void set_thread_affinity(std::thread& t, size_t phys_core)
