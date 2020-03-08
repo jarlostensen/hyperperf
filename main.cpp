@@ -101,9 +101,9 @@ namespace perf
 		constexpr unsigned kSubLeaf_SMTLevel = 0;
 		constexpr unsigned kSubLeaf_ProcessorCore = 1;
 			
-		//zzz: this is not right...at all...not on my Mac at least
-		if(!_proc_info._cpuid_caps._1f_leaf)
+		if(_proc_info._cpuid_caps._1f_leaf)
 		{
+			//TODO: this requires work, it's not correct
 		    std::cout << "1f leaf\n";
 			cpu_id = {0x1f,kSubLeaf_SMTLevel};
 			std::cout << "leaf 0 " << cpu_id << "\n";
@@ -122,8 +122,6 @@ namespace perf
 			std::cout << "b leaf\n";
 			auto level_type = 0u;
 			auto level_shift = 0u;
-			auto smt_count = 0u;
-			auto core_count = 0u;
 			_proc_info._phys_cores = 0;
 			_proc_info._num_cores = 0;
 			for(auto sub_leaf = kSubLeaf_SMTLevel; ;++sub_leaf)
@@ -150,15 +148,17 @@ namespace perf
 						// core
 						//NOTE: this level shift includes the SMT shift (see Intel docs)
 						_proc_info._core_mask_width = level_shift;
-						// remove SMT part
-						_proc_info._num_cores += (level_shift >> _proc_info._smt_mask_width);
-						++core_count;
+						// remove SMT part, this is the number of physical cores available in this package, but it's not guaranteed to be the actual count present...
+						_proc_info._phys_cores += 1u << size_t(level_shift >> _proc_info._smt_mask_width);
+						_proc_info._num_cores += cpu_id.ebx();
 						//std::cout << "core " << level_shift << ", 2xAPIC id " << cpu_id.edx() << "\n";
 					}
 					break;
+					default:
+						std::cout << "Extra: type " << level_type << ", level shift " << level_shift << "\n";
+					break;
 				}
 			}
-			_proc_info._phys_cores = core_count;			
 		}
 
 		std::cout << "phys cores (processors) " << _proc_info._phys_cores << ", logical cores " << _proc_info._num_cores << "\n";
